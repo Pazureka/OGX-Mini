@@ -1,0 +1,31 @@
+name: Build
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: OGX-Mini Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        board: [RP2350_USB_A]
+
+    steps:
+      - name: Install Arm GNU Toolchain (arm-none-eabi-gcc)
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+
+      - name: Checkout OGX-Mini
+        uses: actions/checkout@v4
+        with:
+          path: ogx-mini
+          submodules: recursive
+
+      - name: Build OGX-Mini
+        run: |
+          cmake -S ogx-mini/Firmware/RP2040 -B ogx-mini/Firmware/RP2040/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOGXM_BOARD=${{ matrix.board }} -DMAX_GAMEPADS=1
+          cmake --build ogx-mini/Firmware/RP2040/build --config Release --parallel $(nproc)
+
+      - name: Upload OGX-Mini
+        uses: actions/upload-artifact@v4
+        with:
+          name: OGX-Mini-${{ matrix.board }}
+          path: ogx-mini/Firmware/RP2040/build/OGX-Mini*.uf2
