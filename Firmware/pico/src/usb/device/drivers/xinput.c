@@ -152,24 +152,30 @@ static bool xinput_ctrl_xfer_cb(usbd_handle_t* handle, const usb_ctrl_req_t* req
         break;
     case USB_REQ_TYPE_VENDOR | USB_REQ_RECIP_DEVICE:
         switch (req->bRequest) {
-        // case XINPUT_AUTH_REQ_1:
-        // // xsm3_set_vid_pid(XINPUT_VID, XINPUT_PID);
-        //     xsm3_initialise_state();
-        //     xsm3_set_identification_data(xsm3_id_data_ms_controller);
-        //     return usbd_send_ctrl_resp(handle, xsm3_id_data_ms_controller,
-        //                                 sizeof(xsm3_id_data_ms_controller), NULL);
-        // case XINPUT_AUTH_REQ_2:
-        //     xsm3_do_challenge_init(req->data);
-        //     return true;
-        // case XINPUT_AUTH_REQ_3:
-        //     xsm3_do_challenge_verify(req->data);
-        //     return true;
-        // case XINPUT_AUTH_REQ_4:
-        //     return usbd_send_ctrl_resp(handle, xsm3_challenge_response,
-        //                                 sizeof(xsm3_challenge_response), NULL);
-        // case XINPUT_AUTH_REQ_5:
-        //     uint16_t state = 2; // 1 = in-progress, 2 = complete
-        //     return usbd_send_ctrl_resp(handle, &state, sizeof(state), NULL);
+        case XINPUT_AUTH_REQ_1:
+            /* Initialize XSM3 state and send identification data */
+            xsm3_initialise_state();
+            xsm3_set_identification_data(xsm3_id_data_ms_controller);
+            return usbd_send_ctrl_resp(handle, xsm3_id_data_ms_controller,
+                                        sizeof(xsm3_id_data_ms_controller), NULL);
+        case XINPUT_AUTH_REQ_2:
+            /* Process challenge initialization packet */
+            xsm3_do_challenge_init(req->data);
+            return true;
+        case XINPUT_AUTH_REQ_3:
+            /* Process challenge verification packet */
+            xsm3_do_challenge_verify(req->data);
+            return true;
+        case XINPUT_AUTH_REQ_4:
+            /* Send challenge response data */
+            return usbd_send_ctrl_resp(handle, xsm3_challenge_response,
+                                        sizeof(xsm3_challenge_response), NULL);
+        case XINPUT_AUTH_REQ_5:
+            /* Report authentication complete */
+            {
+            uint16_t auth_state = 2; // 1 = in-progress, 2 = complete
+            return usbd_send_ctrl_resp(handle, &auth_state, sizeof(auth_state), NULL);
+            }
         case 144:
             if (req->wIndex == 4) {
                 return usbd_send_ctrl_resp(handle, XINPUT_VENDOR_BLOB, 
