@@ -46,13 +46,14 @@ extern const usb_device_driver_t USBD_DRIVER_DINPUT;
 extern const usb_device_driver_t USBD_DRIVER_PS3;
 extern const usb_device_driver_t USBD_DRIVER_PSCLASSIC;
 extern const usb_device_driver_t USBD_DRIVER_SWITCH;
-extern const usb_device_driver_t USBD_DRIVER_WEBAPP;
 extern const usb_device_driver_t USBD_DRIVER_UART_BRIDGE;
 extern const usb_device_driver_t USBD_DRIVER_XBOXOG_HUB;
 extern const usb_device_driver_t USBD_DRIVER_XBOXOG_XMU;
 extern const usb_device_driver_t USBD_DRIVER_XBOXOG_XBLC;
+#if (OGXM_BOARD == OGXM_BOARD_DEVKIT) || (OGXM_BOARD == OGXM_BOARD_DEVKIT_ESP32)
 extern const usb_device_driver_t USBD_DRIVER_WEBAPP;
 extern const usb_device_driver_t USBD_DRIVER_NET;
+#endif
 
 void usb_device_rumble_cb(usbd_handle_t* handle, const gamepad_rumble_t* rumble);
 void usb_device_audio_cb(usbd_handle_t* handle, const gamepad_pcm_out_t* pcm_out);

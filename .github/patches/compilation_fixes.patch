@@ -1,0 +1,27 @@
+--- a/Firmware/pico/external/pico_usb/src/usbd/dcd/dcd_pico.c
++++ b/Firmware/pico/external/pico_usb/src/usbd/dcd/dcd_pico.c
+@@ -7,6 +7,7 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ #include <string.h>
++#include <stdio.h>
+ #include <pico/binary_info.h>
+ #include <pico/stdlib.h>
+ #include <hardware/structs/usb.h>
+--- a/Firmware/pico/src/usb/device/drivers/msc.c
++++ b/Firmware/pico/src/usb/device/drivers/msc.c
+@@ -1,6 +1,7 @@
+ #include "board_config.h"
+ #include "usbd/usbd.h"
+ #include "usb/device/device_private.h"
++#include "log/log.h"
+ #if SD_CARD_ENABLED
+ // #if 0
+ 
+@@ -11,7 +12,6 @@
+ #include "sdcard/sdcard.h"
+ #include "usb/descriptors/msc.h"
+ #include "usb/device/device.h"
+-#include "log/log.h"
+ 
+ #define MSC_BLOCK_SIZE SD_BLOCK_SIZE

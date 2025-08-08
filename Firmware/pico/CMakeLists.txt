@@ -26,12 +26,6 @@ set(PICO_PIO_USB_PATH   ${EXTERNAL_DIR}/Pico-PIO-USB)
 set(PICO_TINYUSB_PATH   ${EXTERNAL_DIR}/tinyusb)
 set(BLUEPAD32_PATH      ${EXTERNAL_DIR}/bluepad32)
 set(PICO_BTSTACK_PATH   ${EXTERNAL_DIR}/bluepad32/external/btstack)
-set(LWIP_DIR            ${EXTERNAL_DIR}/lwip)
-
-set(LWIP_INCLUDE_DIRS
-    ${LWIP_DIR}/src/include
-    ${SRC}/webserver/lwip
-)
 
 project(${FW_NAME} C CXX ASM)
 
@@ -42,7 +36,6 @@ add_subdirectory(${EXTERNAL_DIR}/libxsm3)
 add_subdirectory(${EXTERNAL_DIR}/g726)
 add_subdirectory(${EXTERNAL_DIR}/libfixmath libfixmath)
 add_subdirectory(${EXTERNAL_DIR}/fatfs)
-include(${LWIP_DIR}/src/Filelists.cmake)
 
 add_executable(${FW_NAME}
     ${SRC}/main_standard.c
@@ -78,9 +71,6 @@ add_executable(${FW_NAME}
     ${SRC}/usb/device/drivers/switch.c
     ${SRC}/usb/device/drivers/psclassic.c
     ${SRC}/usb/device/drivers/uart_bridge.c
-    ${SRC}/usb/device/drivers/webapp.c
-    ${SRC}/usb/device/drivers/net.c
-    ${SRC}/usb/device/drivers/rndis/rndis.c
 
     ${SRC}/usb/host/host.c
     ${SRC}/usb/host/drivers/xboxog_gp.c
@@ -108,18 +98,35 @@ add_executable(${FW_NAME}
     ${SRC}/four_channel/master.c
     ${SRC}/four_channel/slave.c
 
-    ${SRC}/webserver/webserver.c
-    ${SRC}/webserver/lwip/sys.c
-    ${SRC}/webserver/networking/dhserver.c
-    ${SRC}/webserver/networking/dnserver.c
     # ${SRC}/webserver/networking/rndis_reports.c
 )
+
+# Conditionally add webserver/LWIP functionality for devkit boards
+if(OGXM_BOARD STREQUAL "OGXM_BOARD_DEVKIT" OR OGXM_BOARD STREQUAL "OGXM_BOARD_DEVKIT_ESP32")
+    set(LWIP_DIR ${EXTERNAL_DIR}/lwip)
+    set(LWIP_INCLUDE_DIRS
+        ${LWIP_DIR}/src/include
+        ${SRC}/webserver/lwip
+    )
+    include(${LWIP_DIR}/src/Filelists.cmake)
+    
+    target_sources(${FW_NAME} PRIVATE
+        ${SRC}/webserver/webserver.c
+        ${SRC}/webserver/lwip/sys.c
+        ${SRC}/webserver/networking/dhserver.c
+        ${SRC}/webserver/networking/dnserver.c
+        ${SRC}/usb/device/drivers/webapp.c
+        ${SRC}/usb/device/drivers/net.c
+        ${SRC}/usb/device/drivers/rndis/rndis.c
+    )
+    target_include_directories(${FW_NAME} PRIVATE ${LWIP_INCLUDE_DIRS})
+    target_link_libraries(${FW_NAME} PRIVATE lwipcore lwipallapps)
+endif()
 
 target_include_directories(${FW_NAME} 
     PRIVATE
         ${SRC}
         ${SRC}/webserver/networking/
-        ${LWIP_INCLUDE_DIRS}
 )
 
 target_link_libraries(${FW_NAME} 
@@ -146,9 +153,6 @@ target_link_libraries(${FW_NAME}
         tinyusb_board
         tinyusb_host
         tinyusb_pico_pio_usb
-
-        lwipcore
-        lwipallapps
 )
 
 target_compile_definitions(${FW_NAME} 
