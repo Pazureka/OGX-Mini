@@ -125,6 +125,61 @@ static bool xinput_set_config_cb(usbd_handle_t* handle, uint8_t config) {
     return usbd_configure_all_eps(handle, &XINPUT_DESC_CONFIG);
 }
 
+/* Unified XSM3 authentication handler */
+static bool handle_xsm3_auth(usbd_handle_t* handle, const usb_ctrl_req_t* req) {
+    switch (req->bRequest) {
+    case XINPUT_AUTH_REQ_1:
+        xsm3_initialise_state();
+        xsm3_set_identification_data(xsm3_id_data_ms_controller);
+        ogxm_logd("XSM3: send identification data (0x81)");
+        return usbd_send_ctrl_resp(handle, xsm3_id_data_ms_controller,
+                                    sizeof(xsm3_id_data_ms_controller), NULL);
+    
+    case XINPUT_AUTH_REQ_2:
+        if (req->wLength < 0x22) {
+            ogxm_loge("XSM3: challenge init too short: %u < 0x22", req->wLength);
+            return false;
+        }
+        {
+            uint8_t challenge[0x22];
+            memcpy(challenge, req->data, sizeof(challenge));
+            xsm3_do_challenge_init(challenge);
+            ogxm_logd("XSM3: challenge init (0x82), len=%u", req->wLength);
+            return true;
+        }
+    
+    case XINPUT_AUTH_REQ_3:
+        if (req->wLength < 0x16) {
+            ogxm_loge("XSM3: challenge verify too short: %u < 0x16", req->wLength);
+            return false;
+        }
+        {
+            uint8_t challenge[0x16];
+            memcpy(challenge, req->data, sizeof(challenge));
+            xsm3_do_challenge_verify(challenge);
+            ogxm_logd("XSM3: challenge verify (0x87), len=%u", req->wLength);
+            return true;
+        }
+    
+    case XINPUT_AUTH_REQ_4:
+        {
+            uint16_t pkt_len = (uint16_t)xsm3_challenge_response[4] + 6;
+            ogxm_logd("XSM3: send challenge response (0x83), %u bytes", pkt_len);
+            return usbd_send_ctrl_resp(handle, xsm3_challenge_response, pkt_len, NULL);
+        }
+    
+    case XINPUT_AUTH_REQ_5:
+        {
+            uint16_t auth_state = 2; // 1 = in-progress, 2 = complete
+            ogxm_logd("XSM3: auth complete (0x86)");
+            return usbd_send_ctrl_resp(handle, &auth_state, sizeof(auth_state), NULL);
+        }
+    
+    default:
+        return false;
+    }
+}
+
 static void xinput_configured_cb(usbd_handle_t* handle, uint8_t config) {
     (void)config;
     xinput_state_t* xinput = xinput_state[handle->port];
@@ -152,32 +207,18 @@ static bool xinput_ctrl_xfer_cb(usbd_handle_t* handle, const usb_ctrl_req_t* req
         break;
     case USB_REQ_TYPE_VENDOR | USB_REQ_RECIP_DEVICE:
         switch (req->bRequest) {
+        case 0xA9: /* Vendor probe - ACK */
+        case 0x84: /* Init request - ACK */
+            return true;
         case XINPUT_AUTH_REQ_1:
-            /* Initialize XSM3 state and send identification data */
-            xsm3_initialise_state();
-            xsm3_set_identification_data(xsm3_id_data_ms_controller);
-            return usbd_send_ctrl_resp(handle, xsm3_id_data_ms_controller,
-                                        sizeof(xsm3_id_data_ms_controller), NULL);
         case XINPUT_AUTH_REQ_2:
-            /* Process challenge initialization packet */
-            xsm3_do_challenge_init(req->data);
-            return true;
         case XINPUT_AUTH_REQ_3:
-            /* Process challenge verification packet */
-            xsm3_do_challenge_verify(req->data);
-            return true;
         case XINPUT_AUTH_REQ_4:
-            /* Send challenge response data */
-            return usbd_send_ctrl_resp(handle, xsm3_challenge_response,
-                                        sizeof(xsm3_challenge_response), NULL);
         case XINPUT_AUTH_REQ_5:
-            /* Report authentication complete */
-            {
-            uint16_t auth_state = 2; // 1 = in-progress, 2 = complete
-            return usbd_send_ctrl_resp(handle, &auth_state, sizeof(auth_state), NULL);
-            }
+            return handle_xsm3_auth(handle, req);
         case 144:
             if (req->wIndex == 4) {
+                ogxm_logd("XINPUT VENDOR 0x90: send blob, idx=4");
                 return usbd_send_ctrl_resp(handle, XINPUT_VENDOR_BLOB, 
                                            sizeof(XINPUT_VENDOR_BLOB), NULL);
             } 
@@ -186,7 +227,7 @@ static bool xinput_ctrl_xfer_cb(usbd_handle_t* handle, const usb_ctrl_req_t* req
             if (req->wValue == 0 && (req->wIndex == 0)) {
                 const uint8_t status[4] = {0x03, 0xF8, 0x86, 0x28};
                 return usbd_send_ctrl_resp(handle, status, sizeof(status), NULL);
-            } 
+            }
             break;
         default:
             break;
@@ -194,9 +235,21 @@ static bool xinput_ctrl_xfer_cb(usbd_handle_t* handle, const usb_ctrl_req_t* req
         break;
     case USB_REQ_TYPE_VENDOR | USB_REQ_RECIP_INTERFACE:
         switch (req->bRequest) {
+        case 0xA9: /* Vendor probe - ACK */
+        case 0x84: /* Init request - ACK */
+            return true;
+        /* XSM3 authentication - use unified handler */
+        case XINPUT_AUTH_REQ_1:
+        case XINPUT_AUTH_REQ_2:
+        case XINPUT_AUTH_REQ_3:
+        case XINPUT_AUTH_REQ_4:
+        case XINPUT_AUTH_REQ_5:
+            return handle_xsm3_auth(handle, req);
         case 1:
             if (req->wValue == 0 && req->wIndex == 0) {
-                // STALL
+                const uint8_t status[4] = {0x03, 0xF8, 0x86, 0x28};
+                ogxm_logd("XINPUT VENDOR IF: bReq=1 wValue=0 -> 4B status");
+                return usbd_send_ctrl_resp(handle, status, sizeof(status), NULL);
             } else if (req->wValue == 0x0100 && (req->wIndex == 0)) {
                 const uint8_t status[3] = {0x01, 0x03, 0x0E};
                 return usbd_send_ctrl_resp(handle, status, sizeof(status), NULL);

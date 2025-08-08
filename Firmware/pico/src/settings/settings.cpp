@@ -49,7 +49,7 @@ void settings_init(void) {
     ogxm_logd("Settings not initialized, setting default values\n");
 
     settings.init_flag = INIT_FLAG;
-    settings.device_type = USBD_TYPE_XBOXOG_GP;
+    settings.device_type = USBD_TYPE_XINPUT;
     settings.addons = 0;
     for (uint8_t i = 0; i < GAMEPADS_MAX; i++) {
         settings.active_profile_id[i] = 1;
