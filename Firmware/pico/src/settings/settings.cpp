@@ -163,7 +163,7 @@ void settings_get_default_joystick(joystick_settings_t* joy_set) {
     joy_set->diag_scale_max = fix16_from_int(1);
     joy_set->curve = fix16_from_int(1);
     joy_set->uncap_radius = 1;
-    joy_set->invert_y = 0;
+    joy_set->invert_y = 1;
     joy_set->invert_x = 0;
 }
 
